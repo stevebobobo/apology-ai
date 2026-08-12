@@ -12,6 +12,14 @@ let currentConfig = {
 document.addEventListener('DOMContentLoaded', () => {
   setupToneSelection();
   loadSavedConfig();
+  
+  // Pre-load Web Speech voices
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }
 });
 
 // Setup tone grid card click handlers
@@ -446,23 +454,53 @@ function toggleSpeechRecognition() {
 
 // TTS: Text-to-Speech Reader for Cards
 function speakText(elementId) {
+  if (!('speechSynthesis' in window)) {
+    alert('您的瀏覽器或裝置不支援語音朗讀功能，建議使用 Chrome 或 Edge 瀏覽器！');
+    return;
+  }
+
   stopSpeechSynthesis();
-  const text = document.getElementById(elementId).textContent;
-  if (!text) return;
+
+  const textElement = document.getElementById(elementId);
+  const text = textElement ? textElement.textContent.trim() : '';
+
+  if (!text || text === '...') {
+    showToast('⚠️ 請先點擊生成道歉方案後再進行語音朗讀！');
+    return;
+  }
+
+  // Resume synthesis if browser paused it
+  if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume();
+  }
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'zh-TW';
 
-  // Select best Mandarin voice if available
+  // Safely find Chinese voice
   const voices = window.speechSynthesis.getVoices();
-  const zhVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('TW'));
-  if (zhVoice) utterance.voice = zhVoice;
+  if (voices && voices.length > 0) {
+    const zhVoice = voices.find(v => v.lang && (v.lang.includes('zh') || v.lang.includes('TW') || v.lang.includes('HK')));
+    if (zhVoice) {
+      utterance.voice = zhVoice;
+    }
+  }
 
   const rateSelect = document.getElementById('ttsRateSelect');
-  if (rateSelect) utterance.rate = parseFloat(rateSelect.value) || 1;
+  if (rateSelect) {
+    utterance.rate = parseFloat(rateSelect.value) || 1;
+  }
+
+  utterance.onstart = () => {
+    showToast('🔊 正在朗讀文案中...');
+  };
+
+  utterance.onerror = (err) => {
+    console.error('SpeechSynthesis Error:', err);
+    showToast('⚠️ 語音播放中斷，請確認系統聲音輸出設定');
+  };
 
   window.speechSynthesis.speak(utterance);
-  showToast('🔊 正在用語音朗讀文案...');
 }
 
 function stopSpeechSynthesis() {
