@@ -128,7 +128,7 @@ async function generateApology() {
     displayResults(resultData);
   } catch (error) {
     console.error('API Error:', error);
-    alert('AI 串接出現狀況，切換至離線擬真模式提供結果！');
+    alert(`⚠️ ${error.message || 'AI 串接出現狀況'}\n\n系統已自動為您切換至「離線保險模式」提供精美範本結果！`);
     const fallbackData = generateDemoResponse(target, severity, selectedTone, incident);
     displayResults(fallbackData);
   } finally {
@@ -136,39 +136,65 @@ async function generateApology() {
   }
 }
 
-// Gemini API Fetch
+// Gemini API Fetch with Multi-model Fallback & Native JSON Mode
 async function fetchFromGemini(target, severity, tone, incident) {
-  const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出 JSON 格式結果：
+  const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出符合 JSON 格式的結果：
 - 道歉對象：${target}
 - 嚴重程度：${severity}
 - 希望語氣：${tone}
 - 犯錯事件：${incident}
 
-請提供格式如下的 JSON（不要加 markdown 標籤或斜線）：
+必須嚴格返回以下 JSON 結構：
 {
-  "cardA": "首選高情商道歉文案...",
-  "cardB": "適合 Line/簡訊的精簡版...",
-  "cardC": "正式長篇/深刻檢討版...",
-  "actionSuggestion": "實用的實體/行動補救建議..."
+  "cardA": "首選高情商道歉文案（兼具誠意與智慧）",
+  "cardB": "適合 Line/簡訊的精簡對話版",
+  "cardC": "正式長篇/深刻檢討與補救細節版",
+  "actionSuggestion": "實用的實體或行動補救建議"
 }`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentConfig.apiKey}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    })
-  });
+  // Priority model list to ensure maximum compatibility
+  const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  let lastErrorMsg = '';
 
-  const data = await response.json();
-  const rawText = data.candidates[0].content.parts[0].text;
-  return parseJsonResponse(rawText);
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentConfig.apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        lastErrorMsg = data.error?.message || `HTTP ${response.status}`;
+        console.warn(`Model ${model} returned error:`, lastErrorMsg);
+        continue; // Try next model
+      }
+
+      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+        const rawText = data.candidates[0].content.parts[0].text;
+        return parseJsonResponse(rawText);
+      }
+    } catch (err) {
+      console.warn(`Failed fetching from model ${model}:`, err);
+      lastErrorMsg = err.message || '網路連線異常';
+    }
+  }
+
+  // If all Gemini models fail, throw specific error for diagnostics
+  throw new Error(`Gemini API 呼叫失敗：${lastErrorMsg || '請確認 API Key 是否正確或具備權限'}`);
 }
 
 // OpenAI API Fetch
 async function fetchFromOpenAI(target, severity, tone, incident) {
-  const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出 JSON 格式結果：
+  const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出符合 JSON 格式的結果：
 - 道歉對象：${target}
 - 嚴重程度：${severity}
 - 希望語氣：${tone}
@@ -196,6 +222,10 @@ JSON格式：
   });
 
   const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(`OpenAI API 錯誤：${data.error?.message || '驗證失敗'}`);
+  }
+
   return JSON.parse(data.choices[0].message.content);
 }
 
