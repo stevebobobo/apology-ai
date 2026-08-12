@@ -366,6 +366,59 @@ function generateDemoResponse(target, severity, tone, incident) {
   };
 }
 
+// Display Generated Results
+function displayResults(data) {
+  document.getElementById('cardAText').textContent = data.cardA;
+  document.getElementById('cardBText').textContent = data.cardB;
+  document.getElementById('cardCText').textContent = data.cardC;
+  document.getElementById('actionSuggestionText').textContent = data.actionSuggestion;
+
+  const engineTag = document.getElementById('resultEngineTag');
+  if (engineTag) {
+    engineTag.textContent = `Engine: ${currentConfig.provider.toUpperCase()} (${currentConfig.apiKey ? 'Real-time' : 'Demo Fallback'})`;
+  }
+
+  const resultsSection = document.getElementById('resultsSection');
+  resultsSection.style.display = 'block';
+  resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Copy Text to Clipboard
+function copyCardText(elementId) {
+  const textElement = document.getElementById(elementId);
+  const text = textElement ? textElement.textContent.trim() : '';
+  if (!text || text === '...') {
+    showToast('⚠️ 請先生成文案後再複製！');
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('📋 已成功複製文案到剪貼簿！');
+  });
+}
+
+// Share to LINE
+function shareToLine(elementId) {
+  const textElement = document.getElementById(elementId);
+  const text = textElement ? textElement.textContent.trim() : '';
+  if (!text || text === '...') {
+    showToast('⚠️ 請先生成文案後再發送至 LINE！');
+    return;
+  }
+  const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+  window.open(lineUrl, '_blank');
+}
+
+// Toast Display
+function showToast(msg) {
+  const toast = document.getElementById('toastMsg');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2500);
+}
+
 // ==========================================================================
 // Voice Mode, STT (Speech-to-Text), TTS (Text-to-Speech) & Role-Play Logic
 // ==========================================================================
