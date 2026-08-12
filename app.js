@@ -47,6 +47,29 @@ function closeApiKeyModal() {
   document.getElementById('apiModal').classList.remove('active');
 }
 
+// Helper: Discover available Gemini model dynamically via ListModels API
+async function discoverGeminiModel(apiKey) {
+  const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+  const res = await fetch(listUrl);
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    const errMsg = data.error?.message || `HTTP ${res.status}`;
+    throw new Error(errMsg);
+  }
+
+  if (data.models && data.models.length > 0) {
+    // Priority: find flash model, then any generateContent model
+    const flashModel = data.models.find(m => m.name.includes('flash') && m.supportedGenerationMethods?.includes('generateContent'));
+    if (flashModel) return flashModel.name; // returns e.g. "models/gemini-1.5-flash"
+
+    const genModel = data.models.find(m => m.supportedGenerationMethods?.includes('generateContent'));
+    if (genModel) return genModel.name;
+  }
+
+  return 'models/gemini-1.5-flash';
+}
+
 // Test API Key Connection directly
 async function testApiKeyConnection() {
   const provider = document.getElementById('apiProviderSelect').value;
@@ -66,11 +89,12 @@ async function testApiKeyConnection() {
   statusDiv.style.background = 'rgba(99, 102, 241, 0.15)';
   statusDiv.style.color = '#a5b4fc';
   statusDiv.style.border = '1px solid rgba(99, 102, 241, 0.3)';
-  statusDiv.innerHTML = '⏳ 正在向 API 伺服器發送測試請求...';
+  statusDiv.innerHTML = '⏳ 正在向 API 伺服器發送測試與模型偵測...';
 
   try {
     if (provider === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const modelName = await discoverGeminiModel(apiKey);
+      const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +105,7 @@ async function testApiKeyConnection() {
         statusDiv.style.background = 'rgba(16, 185, 129, 0.15)';
         statusDiv.style.color = '#10b981';
         statusDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-        statusDiv.innerHTML = '✅ <b>驗證成功！</b> 此 Gemini API Key 運作完全正常。';
+        statusDiv.innerHTML = `✅ <b>驗證成功！</b> 已匹配模型 <code>${modelName}</code>，API 運作完全正常。`;
       } else {
         const errDetail = data.error?.message || `HTTP ${res.status}`;
         throw new Error(errDetail);
@@ -198,12 +222,15 @@ async function generateApology() {
   }
 }
 
-// Gemini API Fetch with Canonical Model IDs & Payload Fallback
+// Gemini API Fetch with Dynamic Model Discovery & Payload Fallback
 async function fetchFromGemini(target, severity, tone, incident) {
   const cleanKey = (currentConfig.apiKey || '').trim();
   if (!cleanKey) {
     throw new Error('未填寫 API Key，請先在右上角「API 設定」輸入 Key！');
   }
+
+  // Step 1: Dynamically discover the exact valid model name for this user's Key
+  const modelName = await discoverGeminiModel(cleanKey);
 
   const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出符合 JSON 格式的結果：
 - 道歉對象：${target}
@@ -219,57 +246,50 @@ async function fetchFromGemini(target, severity, tone, incident) {
   "actionSuggestion": "實用的實體或行動補救建議"
 }`;
 
-  // Canonical valid Gemini models
-  const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+  const payloads = [
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" }
+    },
+    {
+      contents: [{ parts: [{ text: prompt }] }]
+    }
+  ];
+
   let lastErrorMsg = '';
+  for (const bodyPayload of payloads) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${cleanKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload)
+      });
 
-  for (const model of models) {
-    // Try with JSON generationConfig first, fallback to basic payload
-    const payloads = [
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      },
-      {
-        contents: [{ parts: [{ text: prompt }] }]
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        const errMsg = data.error?.message || `HTTP ${response.status}`;
+        lastErrorMsg = errMsg;
+
+        if (response.status === 400 && (errMsg.includes('API key not valid') || errMsg.includes('INVALID_ARGUMENT'))) {
+          throw new Error(`Google API Key 驗證失敗 (${errMsg})。\n請確認 Key 是否複製正確或已有 AI Studio 存取權限。`);
+        }
+
+        console.warn(`Attempt failed for ${modelName}:`, errMsg);
+        continue;
       }
-    ];
 
-    for (const bodyPayload of payloads) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyPayload)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          const errMsg = data.error?.message || `HTTP ${response.status}`;
-          lastErrorMsg = errMsg;
-
-          // Key authentication error: throw immediately so user can fix key
-          if (response.status === 400 && (errMsg.includes('API key not valid') || errMsg.includes('INVALID_ARGUMENT'))) {
-            throw new Error(`Google API Key 驗證失敗 (${errMsg})。\n請確認 Key 是否複製正確或已有 AI Studio 存取權限。`);
-          }
-
-          console.warn(`Attempt failed for ${model}:`, errMsg);
-          continue;
-        }
-
-        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-          const rawText = data.candidates[0].content.parts[0].text;
-          return parseJsonResponse(rawText);
-        }
-      } catch (err) {
-        if (err.message.includes('API Key 驗證失敗')) {
-          throw err;
-        }
-        console.warn(`Error on ${model}:`, err);
-        lastErrorMsg = err.message || '網路連線異常';
+      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+        const rawText = data.candidates[0].content.parts[0].text;
+        return parseJsonResponse(rawText);
       }
+    } catch (err) {
+      if (err.message.includes('API Key 驗證失敗')) {
+        throw err;
+      }
+      console.warn(`Error on ${modelName}:`, err);
+      lastErrorMsg = err.message || '網路連線異常';
     }
   }
 
