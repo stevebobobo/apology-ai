@@ -42,16 +42,73 @@ function closeApiKeyModal() {
   document.getElementById('apiModal').classList.remove('active');
 }
 
-function toggleApiKeyFields() {
+// Test API Key Connection directly
+async function testApiKeyConnection() {
   const provider = document.getElementById('apiProviderSelect').value;
-  const inputGroup = document.getElementById('apiKeyInputGroup');
-  const label = document.getElementById('apiKeyLabel');
-  
-  if (provider === 'demo') {
-    inputGroup.style.display = 'none';
-  } else {
-    inputGroup.style.display = 'block';
-    label.textContent = provider === 'gemini' ? 'Google Gemini API Key' : 'OpenAI API Key';
+  const apiKey = document.getElementById('userApiKeyInput').value.trim();
+  const statusDiv = document.getElementById('testApiStatus');
+
+  if (!apiKey) {
+    statusDiv.style.display = 'block';
+    statusDiv.style.background = 'rgba(244, 63, 94, 0.15)';
+    statusDiv.style.color = '#f43f5e';
+    statusDiv.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+    statusDiv.innerHTML = '⚠️ 請先輸入 API Key 後再點擊測試！';
+    return;
+  }
+
+  statusDiv.style.display = 'block';
+  statusDiv.style.background = 'rgba(99, 102, 241, 0.15)';
+  statusDiv.style.color = '#a5b4fc';
+  statusDiv.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+  statusDiv.innerHTML = '⏳ 正在向 API 伺服器發送測試請求...';
+
+  try {
+    if (provider === 'gemini') {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidates) {
+        statusDiv.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusDiv.style.color = '#10b981';
+        statusDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusDiv.innerHTML = '✅ <b>驗證成功！</b> 此 Gemini API Key 運作完全正常。';
+      } else {
+        const errDetail = data.error?.message || `HTTP ${res.status}`;
+        throw new Error(errDetail);
+      }
+    } else if (provider === 'openai') {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'ping' }]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.choices) {
+        statusDiv.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusDiv.style.color = '#10b981';
+        statusDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusDiv.innerHTML = '✅ <b>驗證成功！</b> 此 OpenAI API Key 運作完全正常。';
+      } else {
+        const errDetail = data.error?.message || `HTTP ${res.status}`;
+        throw new Error(errDetail);
+      }
+    }
+  } catch (err) {
+    statusDiv.style.background = 'rgba(244, 63, 94, 0.15)';
+    statusDiv.style.color = '#f43f5e';
+    statusDiv.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+    statusDiv.innerHTML = `❌ <b>驗證失敗：</b> ${err.message}`;
   }
 }
 
