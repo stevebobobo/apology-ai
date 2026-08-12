@@ -136,15 +136,20 @@ async function generateApology() {
   }
 }
 
-// Gemini API Fetch with Smart Model Fallback & Invalid Key Detection
+// Gemini API Fetch with Canonical Model IDs & Payload Fallback
 async function fetchFromGemini(target, severity, tone, incident) {
+  const cleanKey = (currentConfig.apiKey || '').trim();
+  if (!cleanKey) {
+    throw new Error('未填寫 API Key，請先在右上角「API 設定」輸入 Key！');
+  }
+
   const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出符合 JSON 格式的結果：
 - 道歉對象：${target}
 - 嚴重程度：${severity}
 - 希望語氣：${tone}
 - 犯錯事件：${incident}
 
-必須嚴格返回以下 JSON 結構：
+必須嚴格返回以下 JSON 結構（只輸出合法 JSON，不要加 markdown 標籤）：
 {
   "cardA": "首選高情商道歉文案（兼具誠意與智慧）",
   "cardB": "適合 Line/簡訊的精簡對話版",
@@ -152,53 +157,61 @@ async function fetchFromGemini(target, severity, tone, incident) {
   "actionSuggestion": "實用的實體或行動補救建議"
 }`;
 
-  // Valid Gemini model identifiers on v1beta
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+  // Canonical valid Gemini models
+  const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
   let lastErrorMsg = '';
 
   for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentConfig.apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json"
+    // Try with JSON generationConfig first, fallback to basic payload
+    const payloads = [
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      },
+      {
+        contents: [{ parts: [{ text: prompt }] }]
+      }
+    ];
+
+    for (const bodyPayload of payloads) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          const errMsg = data.error?.message || `HTTP ${response.status}`;
+          lastErrorMsg = errMsg;
+
+          // Key authentication error: throw immediately so user can fix key
+          if (response.status === 400 && (errMsg.includes('API key not valid') || errMsg.includes('INVALID_ARGUMENT'))) {
+            throw new Error(`Google API Key 驗證失敗 (${errMsg})。\n請確認 Key 是否複製正確或已有 AI Studio 存取權限。`);
           }
-        })
-      });
 
-      const data = await response.json();
-
-      if (!response.ok || data.error) {
-        const errMsg = data.error?.message || `HTTP ${response.status}`;
-        lastErrorMsg = errMsg;
-        
-        // If the key itself is invalid or unauthorized, throw immediately (don't retry other models)
-        if (errMsg.includes('API key not valid') || errMsg.includes('INVALID_ARGUMENT') || response.status === 400 || response.status === 403) {
-          throw new Error(`API Key 無效或未授權 (${errMsg})。請確認在 Google AI Studio 複製的 Key 是否正確！`);
+          console.warn(`Attempt failed for ${model}:`, errMsg);
+          continue;
         }
-        
-        console.warn(`Model ${model} returned error:`, errMsg);
-        continue; // Try next model if it's just a model availability issue
-      }
 
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        const rawText = data.candidates[0].content.parts[0].text;
-        return parseJsonResponse(rawText);
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+          const rawText = data.candidates[0].content.parts[0].text;
+          return parseJsonResponse(rawText);
+        }
+      } catch (err) {
+        if (err.message.includes('API Key 驗證失敗')) {
+          throw err;
+        }
+        console.warn(`Error on ${model}:`, err);
+        lastErrorMsg = err.message || '網路連線異常';
       }
-    } catch (err) {
-      if (err.message.includes('API Key 無效')) {
-        throw err; // Re-throw key validation errors directly to user
-      }
-      console.warn(`Failed fetching from model ${model}:`, err);
-      lastErrorMsg = err.message || '網路連線異常';
     }
   }
 
-  throw new Error(`Gemini API 呼叫失敗：${lastErrorMsg || '請確認 API Key 是否正確或開啟權限'}`);
+  throw new Error(`Gemini API 呼叫失敗：${lastErrorMsg}`);
 }
 
 // OpenAI API Fetch
