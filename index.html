@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apology AI — 高情商道歉大師</title>
+  <meta name="description" content="專為職場、伴侶、朋友與客戶關係設計的高情商 AI 道歉產生器，秒級生成最佳道歉方案。">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="#" class="brand-logo">
+          <div class="brand-icon">🙇‍♂️</div>
+          <span>Apology AI <span style="font-size:0.75rem; color:var(--accent-primary); font-weight:700;">.dev</span></span>
+        </a>
+
+        <div class="header-actions">
+          <span class="badge-status" id="modeBadge">⚡ 離線/保險模式</span>
+          <button class="btn-pill" onclick="openApiKeyModal()">
+            <span>🔑 API 設定</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero Banner -->
+    <section class="hero-section">
+      <div class="hero-tag">
+        <span>✨ 職場/人際關係最佳救星</span>
+      </div>
+      <h1 class="hero-title">沒有解開不了的誤會，<br><span class="text-gradient">只有沒找對的語氣。</span></h1>
+      <p class="hero-subtitle">告別講錯話的尷尬。讓高情商 AI 根據您的過錯情境，秒級量身打造最佳道歉訊息與補救行動。</p>
+    </section>
+
+    <!-- Main Generator Form -->
+    <section class="form-card">
+      <div class="form-grid">
+        <!-- Target Selection -->
+        <div class="form-group">
+          <label class="form-label">🎯 道歉對象</label>
+          <select id="targetSelect" class="select-control">
+            <option value="伴侶/另一半">👩‍❤️‍👨 伴侶 / 另一半</option>
+            <option value="直屬主管/老闆">💼 直屬主管 / 老闆</option>
+            <option value="重要客戶/合作夥伴">🤝 重要客戶 / 合作夥伴</option>
+            <option value="朋友/同事/隊友" selected>👥 朋友 / 同事 / 隊友</option>
+            <option value="父母/長輩">🎒 父母 / 長輩</option>
+          </select>
+        </div>
+
+        <!-- Severity Level -->
+        <div class="form-group">
+          <label class="form-label">🔥 嚴重程度</label>
+          <select id="severitySelect" class="select-control">
+            <option value="微失誤 (氣氛小尷尬)">🟢 微失誤 (氣氛小尷尬)</option>
+            <option value="中度危機 (對方已生氣)" selected>🟡 中度危機 (對方已生氣)</option>
+            <option value="生死關頭 (火燒屁股危機)">🔴 生死關頭 (火燒屁股危機)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tone Selector -->
+      <div class="form-group" style="margin-bottom: 24px;">
+        <label class="form-label">🎭 希望語氣風格</label>
+        <div class="tone-grid" id="toneGrid">
+          <div class="tone-card active" data-tone="無比真誠感人">
+            <div class="tone-icon">💖</div>
+            <div class="tone-name">真誠感人</div>
+          </div>
+          <div class="tone-card" data-tone="專業公關高情商">
+            <div class="tone-icon">🎩</div>
+            <div class="tone-name">專業公關</div>
+          </div>
+          <div class="tone-card" data-tone="幽默搞笑緩和">
+            <div class="tone-icon">🤪</div>
+            <div class="tone-name">幽默化解</div>
+          </div>
+          <div class="tone-card" data-tone="低姿態跪求原諒">
+            <div class="tone-icon">🙇</div>
+            <div class="tone-name">低姿態道歉</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Incident Input -->
+      <div class="form-group" style="margin-bottom: 24px;">
+        <label class="form-label">📝 發生了什麼事？(過錯細節描述)</label>
+        <textarea id="incidentInput" class="textarea-control" rows="3" placeholder="例如：忘記買紀念日禮物、專案報告的財務數字寫錯、約會遲到 40 分鐘..."></textarea>
+        
+        <!-- Quick Scenario Chips -->
+        <div class="scenario-tags">
+          <span style="font-size: 0.8rem; color: var(--text-muted); align-self: center;">快速帶入：</span>
+          <span class="scenario-chip" onclick="setScenario('忘記重要紀念日/生日禮物')">🎂 忘記紀念日/生日</span>
+          <span class="scenario-chip" onclick="setScenario('專案簡報數據寫錯，被主管抓包')">📊 專案報告數據出錯</span>
+          <span class="scenario-chip" onclick="setScenario('工作群組發錯八卦訊息')">💬 群組發錯訊息</span>
+          <span class="scenario-chip" onclick="setScenario('約會遲到 45 分鐘，讓對方在雨中等')">⏰ 約會嚴重遲到</span>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button class="btn-generate" onclick="generateApology()">
+        <span>✨ 秒級生成高情商道歉方案</span>
+      </button>
+    </section>
+
+    <!-- Loading State -->
+    <div class="loading-box" id="loadingBox">
+      <div class="spinner"></div>
+      <h3 style="font-size:1.1rem; font-weight:700;">AI 正在分析大腦同理心區域...</h3>
+      <p style="color:var(--text-secondary); font-size:0.9rem; margin-top:4px;">調配最佳措辭與情商比例中</p>
+    </div>
+
+    <!-- Results Display Section -->
+    <section class="results-section" id="resultsSection">
+      <div class="results-header">
+        <h2 class="results-title">💡 量身打造的 3 種高情商道歉方案</h2>
+        <span style="font-size:0.85rem; color:var(--text-muted);" id="resultEngineTag">Engine: Gemini API</span>
+      </div>
+
+      <div class="cards-grid">
+        <!-- Card 1: Main Recommendation -->
+        <div class="apology-card">
+          <div>
+            <span class="card-type-badge badge-blue">🏆 方案 A：首選高情商版</span>
+            <div class="card-text" id="cardAText">...</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-action" onclick="copyCardText('cardAText')">📋 複製文案</button>
+            <button class="btn-action btn-line" onclick="shareToLine('cardAText')">💬 傳送至 LINE</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Short / Chat Message -->
+        <div class="apology-card">
+          <div>
+            <span class="card-type-badge badge-pink">💬 方案 B：簡訊/LINE速發版</span>
+            <div class="card-text" id="cardBText">...</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-action" onclick="copyCardText('cardBText')">📋 複製文案</button>
+            <button class="btn-action btn-line" onclick="shareToLine('cardBText')">💬 傳送至 LINE</button>
+          </div>
+        </div>
+
+        <!-- Card 3: Formal / Extended -->
+        <div class="apology-card">
+          <div>
+            <span class="card-type-badge badge-amber">📜 方案 C：正式信件/深切檢討版</span>
+            <div class="card-text" id="cardCText">...</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-action" onclick="copyCardText('cardCText')">📋 複製文案</button>
+            <button class="btn-action btn-line" onclick="shareToLine('cardCText')">💬 傳送至 LINE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actionable Remedial Gift Box -->
+      <div class="action-box">
+        <div class="action-icon">🎁</div>
+        <div class="action-content">
+          <h4>💡 建議實體補救行動 (Actionable Suggestion)</h4>
+          <p id="actionSuggestionText">...</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- API Key Config Modal -->
+  <div class="modal-overlay" id="apiModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 設定 API Key (可選)</h3>
+        <button class="btn-close" onclick="closeApiKeyModal()">&times;</button>
+      </div>
+
+      <p style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:16px;">
+        預設開啟「離線 Demo 模式」，不需 Key 即可展示效果。輸入您自己的 Google Gemini 或 OpenAI Key 可啟用實時 AI 生成。
+      </p>
+
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label">選擇 API 模型</label>
+        <select id="apiProviderSelect" class="select-control" onchange="toggleApiKeyFields()">
+          <option value="demo">⚡ 離線 Demo 模式 (免 Key 保險模式)</option>
+          <option value="gemini">✨ Google Gemini API (推薦免費)</option>
+          <option value="openai">🤖 OpenAI API (GPT-4o / GPT-4o-mini)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="apiKeyInputGroup" style="display:none; margin-bottom:20px;">
+        <label class="form-label" id="apiKeyLabel">Gemini API Key</label>
+        <input type="password" id="userApiKeyInput" class="input-control" placeholder="貼上您的 API Key...">
+        <span style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">Key 僅保存在本機瀏覽器，絕不會上傳第三方伺服器。</span>
+      </div>
+
+      <button class="btn-generate" style="padding:12px;" onclick="saveApiKeyConfig()">
+        儲存設定
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toastMsg">已成功複製到剪貼簿！</div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© 2026 Apology AI (stevebobobo). Built for Copilot Vibe Coding Workshop.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
