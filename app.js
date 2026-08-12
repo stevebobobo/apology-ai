@@ -358,41 +358,261 @@ function generateDemoResponse(target, severity, tone, incident) {
   };
 }
 
-// Display Generated Results
-function displayResults(data) {
-  document.getElementById('cardAText').textContent = data.cardA;
-  document.getElementById('cardBText').textContent = data.cardB;
-  document.getElementById('cardCText').textContent = data.cardC;
-  document.getElementById('actionSuggestionText').textContent = data.actionSuggestion;
+// ==========================================================================
+// Voice Mode, STT (Speech-to-Text), TTS (Text-to-Speech) & Role-Play Logic
+// ==========================================================================
 
-  const engineTag = document.getElementById('resultEngineTag');
-  engineTag.textContent = `Engine: ${currentConfig.provider.toUpperCase()} (${currentConfig.apiKey ? 'Real-time' : 'Demo Fallback'})`;
+let isListeningInput = false;
+let isRolePlayListening = false;
+let recognition = null;
 
-  document.getElementById('resultsSection').style.display = 'block';
-  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+// App Mode Switcher (Text vs Voice)
+function switchAppMode(mode) {
+  const tabText = document.getElementById('tabTextMode');
+  const tabVoice = document.getElementById('tabVoiceMode');
+  const textSection = document.getElementById('textModeSection');
+  const voiceSection = document.getElementById('voiceModeSection');
+  const resultsSection = document.getElementById('resultsSection');
+
+  if (mode === 'text') {
+    tabText.classList.add('active');
+    tabVoice.classList.remove('active');
+    textSection.style.display = 'block';
+    voiceSection.style.display = 'none';
+  } else {
+    tabVoice.classList.add('active');
+    tabText.classList.remove('active');
+    textSection.style.display = 'none';
+    resultsSection.style.display = 'none';
+    voiceSection.style.display = 'block';
+  }
+  stopSpeechSynthesis();
 }
 
-// Copy Text to Clipboard
-function copyCardText(elementId) {
+// STT: Speech Recognition for Input Textarea
+function toggleSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('您的瀏覽器不支援 Web Speech 語音輸入，建議使用 Chrome 或 Edge 瀏覽器！');
+    return;
+  }
+
+  const micBtn = document.getElementById('btnMicInput');
+  const micText = document.getElementById('micText');
+  const incidentInput = document.getElementById('incidentInput');
+
+  if (isListeningInput) {
+    if (recognition) recognition.stop();
+    isListeningInput = false;
+    micBtn.classList.remove('listening');
+    micText.textContent = '語音輸入';
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'zh-TW';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isListeningInput = true;
+    micBtn.classList.add('listening');
+    micText.textContent = '聆聽中...';
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    incidentInput.value = transcript;
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Speech Recognition Error:', event.error);
+    isListeningInput = false;
+    micBtn.classList.remove('listening');
+    micText.textContent = '語音輸入';
+  };
+
+  recognition.onend = () => {
+    isListeningInput = false;
+    micBtn.classList.remove('listening');
+    micText.textContent = '語音輸入';
+  };
+
+  recognition.start();
+}
+
+// TTS: Text-to-Speech Reader for Cards
+function speakText(elementId) {
+  stopSpeechSynthesis();
   const text = document.getElementById(elementId).textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('📋 已成功複製文案到剪貼簿！');
-  });
+  if (!text) return;
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-TW';
+
+  // Select best Mandarin voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const zhVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('TW'));
+  if (zhVoice) utterance.voice = zhVoice;
+
+  const rateSelect = document.getElementById('ttsRateSelect');
+  if (rateSelect) utterance.rate = parseFloat(rateSelect.value) || 1;
+
+  window.speechSynthesis.speak(utterance);
+  showToast('🔊 正在用語音朗讀文案...');
 }
 
-// Share to LINE
-function shareToLine(elementId) {
-  const text = document.getElementById(elementId).textContent;
-  const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
-  window.open(lineUrl, '_blank');
+function stopSpeechSynthesis() {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
 }
 
-// Toast Display
-function showToast(msg) {
-  const toast = document.getElementById('toastMsg');
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => {
-    toast.classList.remove('show');
-  }, 2500);
+// Voice Role-Play Interactive Dialogue
+function handleVoiceRolePlayClick() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('您的瀏覽器不支援語音辨識，請使用 Chrome / Edge 瀏覽器！');
+    return;
+  }
+
+  const orb = document.getElementById('voiceOrb');
+  const orbStatus = document.getElementById('orbStatusText');
+  const btnIcon = document.getElementById('rolePlayBtnIcon');
+  const btnText = document.getElementById('rolePlayBtnText');
+
+  if (isRolePlayListening) {
+    return;
+  }
+
+  stopSpeechSynthesis();
+  const roleRec = new SpeechRecognition();
+  roleRec.lang = 'zh-TW';
+  roleRec.continuous = false;
+  roleRec.interimResults = false;
+
+  roleRec.onstart = () => {
+    isRolePlayListening = true;
+    orb.className = 'voice-orb listening';
+    orbStatus.textContent = '🔴 正在聆聽您的發言... (請說話)';
+    btnIcon.textContent = '🔴';
+    btnText.textContent = '聆聽中...';
+  };
+
+  roleRec.onresult = async (event) => {
+    const userSpeech = event.results[0][0].transcript;
+    appendTranscript('user', userSpeech);
+
+    orb.className = 'voice-orb';
+    orbStatus.textContent = '⏳ AI 思考同理心對談中...';
+
+    // Fetch AI Role response
+    const aiResponse = await generateRolePlayReply(userSpeech);
+    appendTranscript('ai', aiResponse);
+
+    // Speak out AI response
+    speakRolePlayResponse(aiResponse);
+  };
+
+  roleRec.onerror = (err) => {
+    console.error('RolePlay Rec Error:', err);
+    isRolePlayListening = false;
+    orb.className = 'voice-orb';
+    orbStatus.textContent = '點擊下方麥克風開始對話';
+    btnIcon.textContent = '🎙️';
+    btnText.textContent = '開始對話 (說話)';
+  };
+
+  roleRec.onend = () => {
+    isRolePlayListening = false;
+    btnIcon.textContent = '🎙️';
+    btnText.textContent = '開始對話 (說話)';
+  };
+
+  roleRec.start();
+}
+
+// AI Role-Play Reply Generator
+async function generateRolePlayReply(userSpeech) {
+  const role = document.getElementById('voiceRoleSelect').value;
+
+  if (currentConfig.provider === 'gemini' && currentConfig.apiKey) {
+    try {
+      const cleanKey = currentConfig.apiKey.trim();
+      const modelName = await discoverGeminiModel(cleanKey);
+      const prompt = `你現在正在與使用者進行「道歉對戲演練」。
+你扮演的角色是：【${role}】。
+使用者剛才對你說了這句話：「${userSpeech}」
+
+請以【${role}】的口吻與情緒回覆他（大約 2~3 句話）。表現出符合該角色的真實情感（如稍微生氣、逼問或猶豫），並考驗使用者的應變能力。不要輸出 JSON，直接輸出講話內容即可：`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${cleanKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return data.candidates[0].content.parts[0].text;
+      }
+    } catch (e) {
+      console.warn('Roleplay AI error:', e);
+    }
+  }
+
+  // Fallback Role Play responses for Demo Mode
+  return getDemoRolePlayResponse(role, userSpeech);
+}
+
+function getDemoRolePlayResponse(role, speech) {
+  if (role.includes('伴侶')) {
+    return `你每次都說你知道錯了，但到底有沒有聽懂我在生氣什麼？這次你要怎麼證明你不會有下一次？`;
+  } else if (role.includes('主管')) {
+    return `這件事情影響到整個團隊的進度。光是口頭道歉不夠，你今天下班前能提出具體的改善與補救計劃嗎？`;
+  } else {
+    return `這對我們公司造成了非常大的困擾。如果你們團隊無法給出合理的補償，我們可能需要重新評估未來的合作關係。`;
+  }
+}
+
+function speakRolePlayResponse(text) {
+  const orb = document.getElementById('voiceOrb');
+  const orbStatus = document.getElementById('orbStatusText');
+
+  orb.className = 'voice-orb speaking';
+  orbStatus.textContent = '🔊 AI 正在回覆對話中...';
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-TW';
+
+  const rateSelect = document.getElementById('ttsRateSelect');
+  if (rateSelect) utterance.rate = parseFloat(rateSelect.value) || 1;
+
+  utterance.onend = () => {
+    orb.className = 'voice-orb';
+    orbStatus.textContent = '點擊下方麥克風繼續對話';
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+function appendTranscript(sender, text) {
+  const box = document.getElementById('transcriptBox');
+  const div = document.createElement('div');
+  div.className = `transcript-msg msg-${sender}`;
+  
+  const prefix = sender === 'user' ? '🗣️ 您：' : '🤖 AI 對手：';
+  div.innerHTML = `<b>${prefix}</b> ${text}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function resetVoiceRolePlay() {
+  stopSpeechSynthesis();
+  const box = document.getElementById('transcriptBox');
+  const role = document.getElementById('voiceRoleSelect').value;
+  box.innerHTML = `<div class="transcript-msg msg-system">System: 已切換角色為【${role}】，請按下「開始對話」進行實時語音演練。</div>`;
 }

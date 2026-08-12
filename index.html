@@ -45,8 +45,18 @@
       <p class="hero-subtitle">告別講錯話的尷尬。讓高情商 AI 根據您的過錯情境，秒級量身打造最佳道歉訊息與補救行動。</p>
     </section>
 
-    <!-- Main Generator Form -->
-    <section class="form-card">
+    <!-- Mode Switcher Tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tabTextMode" onclick="switchAppMode('text')">
+        <span>📑 文字方案模式</span>
+      </button>
+      <button class="mode-tab" id="tabVoiceMode" onclick="switchAppMode('voice')">
+        <span>🎙️ 人聲對戲演練模式 (Voice Role-Play)</span>
+      </button>
+    </div>
+
+    <!-- Mode 1: Main Generator Form (Text Mode) -->
+    <section class="form-card" id="textModeSection">
       <div class="form-grid">
         <!-- Target Selection -->
         <div class="form-group">
@@ -96,8 +106,13 @@
 
       <!-- Incident Input -->
       <div class="form-group" style="margin-bottom: 24px;">
-        <label class="form-label">📝 發生了什麼事？(過錯細節描述)</label>
-        <textarea id="incidentInput" class="textarea-control" rows="3" placeholder="例如：忘記買紀念日禮物、專案報告的財務數字寫錯、約會遲到 40 分鐘..."></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label class="form-label">📝 發生了什麼事？(過錯細節描述)</label>
+          <button class="btn-mic" id="btnMicInput" onclick="toggleSpeechRecognition()">
+            <span id="micIcon">🎙️</span> <span id="micText">語音輸入</span>
+          </button>
+        </div>
+        <textarea id="incidentInput" class="textarea-control" rows="3" placeholder="例如：忘記買紀念日禮物、專案報告的財務數字寫錯、約會遲到 40 分鐘... (可點擊右上角麥克風語音輸入)"></textarea>
         
         <!-- Quick Scenario Chips -->
         <div class="scenario-tags">
@@ -113,6 +128,56 @@
       <button class="btn-generate" onclick="generateApology()">
         <span>✨ 秒級生成高情商道歉方案</span>
       </button>
+    </section>
+
+    <!-- Mode 2: Voice Role-Play Practice Section -->
+    <section class="form-card" id="voiceModeSection" style="display:none;">
+      <div class="voice-header" style="text-align:center; margin-bottom:24px;">
+        <h3 style="font-size:1.3rem; font-weight:800; margin-bottom:6px;">🎭 人聲對戲演練模式 (Role-Play)</h3>
+        <p style="color:var(--text-secondary); font-size:0.92rem;">在正式開口前，讓 AI 扮演對方與您進行實時人聲對話演練，鍛鍊您的心理素質與臨場反應。</p>
+      </div>
+
+      <div class="form-grid" style="margin-bottom:24px;">
+        <div class="form-group">
+          <label class="form-label">🤖 AI 扮演的角色</label>
+          <select id="voiceRoleSelect" class="select-control" onchange="resetVoiceRolePlay()">
+            <option value="生氣的伴侶/另一半">👩‍❤️‍👨 憤怒的伴侶/另一半</option>
+            <option value="嚴厲的直屬主管">💼 嚴厲的直屬主管</option>
+            <option value="失控的大客戶">🤝 生氣的大客戶</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">🔊 AI 語音輸出速度</label>
+          <select id="ttsRateSelect" class="select-control">
+            <option value="1">標準自然 (1.0x)</option>
+            <option value="0.85">緩和冷靜 (0.85x)</option>
+            <option value="1.2">急促逼問 (1.2x)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Voice Interaction Orb -->
+      <div class="voice-orb-container">
+        <div class="voice-orb" id="voiceOrb">
+          <span class="orb-icon" id="orbStatusIcon">🎙️</span>
+        </div>
+        <div class="orb-status" id="orbStatusText">點擊下方麥克風開始對話</div>
+      </div>
+
+      <div class="voice-controls" style="display:flex; justify-content:center; gap:12px; margin-bottom:24px;">
+        <button class="btn-generate" id="btnStartVoice" style="max-width:280px;" onclick="handleVoiceRolePlayClick()">
+          <span id="rolePlayBtnIcon">🎙️</span> <span id="rolePlayBtnText">開始對話 (說話)</span>
+        </button>
+        <button class="btn-action" style="max-width:120px;" onclick="stopSpeechSynthesis()">
+          <span>🔇 停止語音</span>
+        </button>
+      </div>
+
+      <!-- Transcript Box -->
+      <div class="transcript-box" id="transcriptBox">
+        <div class="transcript-msg msg-system">System: 已切換至「對戲演練模式」，請按下「開始對話」按鈕並說出您想對 AI 說的道歉話。</div>
+      </div>
     </section>
 
     <!-- Loading State -->
@@ -137,8 +202,9 @@
             <div class="card-text" id="cardAText">...</div>
           </div>
           <div class="card-actions">
-            <button class="btn-action" onclick="copyCardText('cardAText')">📋 複製文案</button>
-            <button class="btn-action btn-line" onclick="shareToLine('cardAText')">💬 傳送至 LINE</button>
+            <button class="btn-action btn-speech" onclick="speakText('cardAText')">🔊 語音朗讀</button>
+            <button class="btn-action" onclick="copyCardText('cardAText')">📋 複製</button>
+            <button class="btn-action btn-line" onclick="shareToLine('cardAText')">💬 LINE</button>
           </div>
         </div>
 
@@ -149,8 +215,9 @@
             <div class="card-text" id="cardBText">...</div>
           </div>
           <div class="card-actions">
-            <button class="btn-action" onclick="copyCardText('cardBText')">📋 複製文案</button>
-            <button class="btn-action btn-line" onclick="shareToLine('cardBText')">💬 傳送至 LINE</button>
+            <button class="btn-action btn-speech" onclick="speakText('cardBText')">🔊 語音朗讀</button>
+            <button class="btn-action" onclick="copyCardText('cardBText')">📋 複製</button>
+            <button class="btn-action btn-line" onclick="shareToLine('cardBText')">💬 LINE</button>
           </div>
         </div>
 
@@ -161,8 +228,9 @@
             <div class="card-text" id="cardCText">...</div>
           </div>
           <div class="card-actions">
-            <button class="btn-action" onclick="copyCardText('cardCText')">📋 複製文案</button>
-            <button class="btn-action btn-line" onclick="shareToLine('cardCText')">💬 傳送至 LINE</button>
+            <button class="btn-action btn-speech" onclick="speakText('cardCText')">🔊 語音朗讀</button>
+            <button class="btn-action" onclick="copyCardText('cardCText')">📋 複製</button>
+            <button class="btn-action btn-line" onclick="shareToLine('cardCText')">💬 LINE</button>
           </div>
         </div>
       </div>
