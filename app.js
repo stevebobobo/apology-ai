@@ -136,7 +136,7 @@ async function generateApology() {
   }
 }
 
-// Gemini API Fetch with Multi-model Fallback & Native JSON Mode
+// Gemini API Fetch with Smart Model Fallback & Invalid Key Detection
 async function fetchFromGemini(target, severity, tone, incident) {
   const prompt = `你是一位頂級高情商公關專家。請針對以下道歉需求，輸出符合 JSON 格式的結果：
 - 道歉對象：${target}
@@ -152,8 +152,8 @@ async function fetchFromGemini(target, severity, tone, incident) {
   "actionSuggestion": "實用的實體或行動補救建議"
 }`;
 
-  // Priority model list to ensure maximum compatibility
-  const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  // Valid Gemini model identifiers on v1beta
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
   let lastErrorMsg = '';
 
   for (const model of models) {
@@ -173,9 +173,16 @@ async function fetchFromGemini(target, severity, tone, incident) {
       const data = await response.json();
 
       if (!response.ok || data.error) {
-        lastErrorMsg = data.error?.message || `HTTP ${response.status}`;
-        console.warn(`Model ${model} returned error:`, lastErrorMsg);
-        continue; // Try next model
+        const errMsg = data.error?.message || `HTTP ${response.status}`;
+        lastErrorMsg = errMsg;
+        
+        // If the key itself is invalid or unauthorized, throw immediately (don't retry other models)
+        if (errMsg.includes('API key not valid') || errMsg.includes('INVALID_ARGUMENT') || response.status === 400 || response.status === 403) {
+          throw new Error(`API Key 無效或未授權 (${errMsg})。請確認在 Google AI Studio 複製的 Key 是否正確！`);
+        }
+        
+        console.warn(`Model ${model} returned error:`, errMsg);
+        continue; // Try next model if it's just a model availability issue
       }
 
       if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
@@ -183,13 +190,15 @@ async function fetchFromGemini(target, severity, tone, incident) {
         return parseJsonResponse(rawText);
       }
     } catch (err) {
+      if (err.message.includes('API Key 無效')) {
+        throw err; // Re-throw key validation errors directly to user
+      }
       console.warn(`Failed fetching from model ${model}:`, err);
       lastErrorMsg = err.message || '網路連線異常';
     }
   }
 
-  // If all Gemini models fail, throw specific error for diagnostics
-  throw new Error(`Gemini API 呼叫失敗：${lastErrorMsg || '請確認 API Key 是否正確或具備權限'}`);
+  throw new Error(`Gemini API 呼叫失敗：${lastErrorMsg || '請確認 API Key 是否正確或開啟權限'}`);
 }
 
 // OpenAI API Fetch
