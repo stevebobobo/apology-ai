@@ -36,6 +36,11 @@ function setScenario(text) {
 // API Config Modal Handlers
 function openApiKeyModal() {
   document.getElementById('apiModal').classList.add('active');
+  toggleApiKeyFields();
+  const input = document.getElementById('userApiKeyInput');
+  if (input) {
+    setTimeout(() => input.focus(), 150);
+  }
 }
 
 function closeApiKeyModal() {

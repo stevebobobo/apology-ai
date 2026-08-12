@@ -193,20 +193,20 @@
       <div class="form-group" style="margin-bottom:16px;">
         <label class="form-label">選擇 API 模型</label>
         <select id="apiProviderSelect" class="select-control" onchange="toggleApiKeyFields()">
+          <option value="gemini" selected>✨ Google Gemini API (推薦免費)</option>
           <option value="demo">⚡ 離線 Demo 模式 (免 Key 保險模式)</option>
-          <option value="gemini">✨ Google Gemini API (推薦免費)</option>
           <option value="openai">🤖 OpenAI API (GPT-4o / GPT-4o-mini)</option>
         </select>
       </div>
 
-      <div class="form-group" id="apiKeyInputGroup" style="display:none; margin-bottom:20px;">
-        <label class="form-label" id="apiKeyLabel">Gemini API Key</label>
+      <div class="form-group" id="apiKeyInputGroup" style="display:block; margin-bottom:20px;">
+        <label class="form-label" id="apiKeyLabel">Google Gemini API Key</label>
         <div style="display:flex; gap:8px;">
-          <input type="password" id="userApiKeyInput" class="input-control" placeholder="貼上您的 API Key..." style="flex:1;">
+          <input type="password" id="userApiKeyInput" class="input-control" placeholder="貼上您的 API Key (如: AIzaSy...)" style="flex:1;">
           <button class="btn-action" style="flex:0 0 100px;" onclick="testApiKeyConnection()">🧪 測試連線</button>
         </div>
         <div id="testApiStatus" style="font-size:0.83rem; margin-top:8px; display:none; padding:8px 12px; border-radius:8px;"></div>
-        <span style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">Key 僅保存在本機瀏覽器，絕不會上傳第三方伺服器。</span>
+        <span style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">Key 僅保存在本機瀏覽器 localStorage，絕不上傳第三方伺服器。</span>
       </div>
 
       <button class="btn-generate" style="padding:12px;" onclick="saveApiKeyConfig()">
