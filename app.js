@@ -362,8 +362,16 @@ function generateDemoResponse(target, severity, tone, incident) {
     cardA: `【誠摯溝通】\n關於「${incident}」這件事，我第一時間深切檢討了自己。我知道這讓你感到不舒服，我也完全理解你生氣的原因。這絕對是我的疏忽，我非常在乎你的感受，真的非常對不起！`,
     cardB: `抱歉！剛才「${incident}」是我太粗心了！不要生氣了好嗎？今晚我請客賠罪，你想吃什麼我都訂！🥺`,
     cardC: `【深刻檢討與致歉信】\n致 ${target}：\n非常抱歉因為「${incident}」給您帶來了困擾。經過我的深切反省，我已針對此次失誤制定了改善措施，未來絕不會再讓類似情況發生。懇請您給予修正與補救的機會。`,
-    actionSuggestion: `針對「${target}」，建議立刻帶著對方平時最愛的飲料/咖啡，並附上一張手寫的道歉小卡，親自遞交表露誠意。`
+    actionSuggestion: `1. 選擇一個平靜的時機，主當面好好地、誠懇地道歉，眼神交流很重要。\n\n2. 讓對方發洩情緒，不要打斷或辯解，耐心傾聽他們的擔憂，並表示理解出發點。\n\n3. 主動告知對方你已經採取的補救措施，讓對方看到你的實際行動與負責態度。\n\n4. 適時匯報後續進展與改善成果，逐步重建彼此的信任感。\n\n5. 準備一份對方喜歡的小禮物或親手買大杯熱飲，表達誠心與體貼。`
   };
+}
+
+// Auto-format action suggestion text into clean numbered line breaks
+function formatActionSuggestionText(text) {
+  if (!text) return '';
+  // Force newlines before " 2. ", " 3. ", " 4. " if not already on newlines
+  let formatted = text.replace(/([^\n])\s*(\d+[\.\.\)])\s*/g, '$1\n\n$2 ');
+  return formatted.trim();
 }
 
 // Display Generated Results
@@ -371,7 +379,7 @@ function displayResults(data) {
   document.getElementById('cardAText').textContent = data.cardA;
   document.getElementById('cardBText').textContent = data.cardB;
   document.getElementById('cardCText').textContent = data.cardC;
-  document.getElementById('actionSuggestionText').textContent = data.actionSuggestion;
+  document.getElementById('actionSuggestionText').textContent = formatActionSuggestionText(data.actionSuggestion);
 
   const engineTag = document.getElementById('resultEngineTag');
   if (engineTag) {

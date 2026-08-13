@@ -658,6 +658,8 @@ body {
 .action-content p {
   color: var(--text-secondary);
   font-size: 0.93rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
 }
 
 /* Modal */
